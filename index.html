@@ -89,11 +89,12 @@
     createPlayer(-30 + i * 6, 15, 0x0000ff, i + 1);
   }
 
-  // ドラッグで移動処理
+  // ドラッグ・タップ判定
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
   let selectedPlayer = null;
   let dragging = false;
+  let downPos = {x:0, y:0};
 
   function getMouse(event) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -112,12 +113,14 @@
     const intersects = raycaster.intersectObjects(players);
     if (intersects.length > 0) {
       selectedPlayer = intersects[0].object;
-      dragging = true;
     }
+    downPos = {x: event.clientX || event.touches[0].clientX, y: event.clientY || event.touches[0].clientY};
+    dragging = false;
   }
 
   function onPointerMove(event) {
-    if (!selectedPlayer || !dragging) return;
+    if (!selectedPlayer) return;
+    dragging = true;
     getMouse(event);
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObject(field);
@@ -127,9 +130,15 @@
   }
 
   function onPointerUp(event) {
-    if (!dragging && selectedPlayer) {
-      // 視点切り替え
-      playerView(selectedPlayer);
+    if (selectedPlayer) {
+      const upPos = {x: event.clientX || (event.changedTouches && event.changedTouches[0].clientX),
+                     y: event.clientY || (event.changedTouches && event.changedTouches[0].clientY)};
+      const dx = Math.abs(upPos.x - downPos.x);
+      const dy = Math.abs(upPos.y - downPos.y);
+      if (!dragging && dx < 5 && dy < 5) {
+        // タップ判定 → 視点切り替え
+        playerView(selectedPlayer);
+      }
     }
     selectedPlayer = null;
     dragging = false;
