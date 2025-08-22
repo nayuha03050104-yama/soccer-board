@@ -46,7 +46,10 @@
     // フィールド
     const fieldWidth = 680, fieldHeight = 1050;
     const fieldGeometry = new THREE.PlaneGeometry(fieldWidth, fieldHeight);
-    const fieldMaterial = new THREE.MeshPhongMaterial({color: 0x228b22, side: THREE.DoubleSide});
+    const fieldMaterial = new THREE.MeshPhongMaterial({
+  color: 0x228b22,
+  side: THREE.DoubleSide
+});
     const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
     field.rotation.x = -Math.PI/2;
     scene.add(field);
