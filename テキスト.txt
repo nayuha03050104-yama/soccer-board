@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>サッカー戦術ボード - 360度視点</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #menu {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: sans-serif;
+    }
+    button {
+      display: block;
+      margin: 5px 0;
+      padding: 5px 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="menu">
+    <p>選手視点を選んでください:</p>
+    <button onclick="setView(0)">選手1</button>
+    <button onclick="setView(1)">選手2</button>
+    <button onclick="setView(2)">選手3</button>
+    <button onclick="setView(3)">選手4</button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.156.1/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.156.1/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    let scene, camera, renderer, controls;
+    let players = [];
+    let viewIndex = -1;
+
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x228B22); // 芝生色
+
+      // カメラ
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 20, 30);
+
+      renderer = new THREE.WebGLRenderer({antialias: true});
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // 操作コントロール
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      // 照明
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(10, 20, 10);
+      scene.add(light);
+
+      // サッカーコート（簡易）
+      const fieldGeometry = new THREE.PlaneGeometry(60, 40);
+      const fieldMaterial = new THREE.MeshPhongMaterial({color: 0x006400});
+      const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
+      field.rotation.x = -Math.PI / 2;
+      scene.add(field);
+
+      // プレイヤー（4人分）
+      const playerGeometry = new THREE.SphereGeometry(1, 32, 32);
+      const playerMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
+      for (let i = 0; i < 4; i++) {
+        const player = new THREE.Mesh(playerGeometry, playerMaterial.clone());
+        player.position.set(-10 + i*7, 1, 0);
+        scene.add(player);
+        players.push(player);
+      }
+    }
+
+    function setView(index) {
+      viewIndex = index;
+      const pos = players[index].position;
+      camera.position.set(pos.x, pos.y + 1.7, pos.z); // 人の目線高さ
+      controls.target.set(pos.x + 1, pos.y + 1.7, pos.z); // 見る方向を初期化
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
