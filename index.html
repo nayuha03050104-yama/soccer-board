@@ -1,186 +1,356 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>サッカー戦術ボード</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; touch-action: none; }
-    #backButton {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 8px 12px;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      display: none;
+    #ui {
+      position: absolute; left: 10px; top: 10px; display: flex; gap: 8px; flex-wrap: wrap;
+      z-index: 10; font-family: system-ui, -apple-system, "Helvetica Neue", Arial;
+    }
+    .btn {
+      padding: 8px 12px; border: none; border-radius: 6px; background: rgba(0,0,0,.6);
+      color: #fff; font-size: 14px;
+    }
+    #hint {
+      position: absolute; right: 10px; top: 10px; z-index: 10;
+      background: rgba(255,255,255,.85); padding: 8px 10px; border-radius: 6px; font-size: 12px;
+      font-family: system-ui, -apple-system, "Helvetica Neue", Arial; line-height: 1.4;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
 <body>
-<button id="backButton">視点を戻す</button>
-<script>
-  // シーン・カメラ・レンダラー
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 50, 80);
-  camera.lookAt(0, 0, 0);
+  <div id="ui">
+    <button id="backBtn" class="btn" style="display:none;">俯瞰に戻る</button>
+    <button id="saveBtn" class="btn">保存</button>
+    <button id="loadBtn" class="btn">読み込み</button>
+    <button id="clearBtn" class="btn">クリア</button>
+  </div>
+  <div id="hint">
+    <b>操作ヒント</b><br>
+    ・選手をタップ→ドラッグで移動<br>
+    ・選手を軽くタップで「選手視点」へ<br>
+    ・選手視点中は指スワイプで360°見回し<br>
+    ・「俯瞰に戻る」で上からの視点に戻る<br>
+    ・保存/読み込みはこの端末のブラウザ内に保存
+  </div>
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+<script>
+  // ====== 基本セットアップ ======
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 55, 85);
+  camera.lookAt(0,0,0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   document.body.appendChild(renderer.domElement);
 
-  // 照明
   const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(50, 100, 50);
+  light.position.set(60, 120, 60);
   scene.add(light);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
-  // サッカーグラウンド
-  const fieldGeometry = new THREE.PlaneGeometry(100, 60);
-  const fieldMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
-  const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
-  field.rotation.x = -Math.PI / 2;
+  // ====== フィールド（100 x 60） ======
+  const FIELD_W = 100, FIELD_H = 60;
+  const field = new THREE.Mesh(
+    new THREE.PlaneGeometry(FIELD_W, FIELD_H),
+    new THREE.MeshPhongMaterial({ color: 0x228B22 })
+  );
+  field.rotation.x = -Math.PI/2;
   scene.add(field);
 
-  // 選手作成
+  // ラインを引くヘルパー
+  function addLine(points, color=0xffffff, width=2){
+    const mat = new THREE.LineBasicMaterial({ color, linewidth: width });
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geo, mat);
+    line.position.y = 0.02; // 床から少し浮かせてチラツキ防止
+    scene.add(line);
+    return line;
+  }
+
+  // 外枠
+  addLine([
+    new THREE.Vector3(-FIELD_W/2,0, -FIELD_H/2),
+    new THREE.Vector3( FIELD_W/2,0, -FIELD_H/2),
+    new THREE.Vector3( FIELD_W/2,0,  FIELD_H/2),
+    new THREE.Vector3(-FIELD_W/2,0,  FIELD_H/2),
+    new THREE.Vector3(-FIELD_W/2,0, -FIELD_H/2),
+  ]);
+
+  // センターライン
+  addLine([
+    new THREE.Vector3(-FIELD_W/2,0, 0),
+    new THREE.Vector3( FIELD_W/2,0, 0)
+  ]);
+
+  // ペナルティエリア（ざっくり寸法：幅40, 奥行16）
+  const PA_W = 40, PA_D = 16;
+  // 手前側（Z=+）
+  addLine([
+    new THREE.Vector3(-PA_W/2,0,  FIELD_H/2),
+    new THREE.Vector3(-PA_W/2,0,  FIELD_H/2 - PA_D),
+    new THREE.Vector3( PA_W/2,0,  FIELD_H/2 - PA_D),
+    new THREE.Vector3( PA_W/2,0,  FIELD_H/2),
+  ]);
+  // 奥側（Z=-）
+  addLine([
+    new THREE.Vector3(-PA_W/2,0, -FIELD_H/2),
+    new THREE.Vector3(-PA_W/2,0, -FIELD_H/2 + PA_D),
+    new THREE.Vector3( PA_W/2,0, -FIELD_H/2 + PA_D),
+    new THREE.Vector3( PA_W/2,0, -FIELD_H/2),
+  ]);
+
+  // ====== ゴール（シンプルな枠） ======
+  function makeGoal(zSign){ // zSign: +1 手前, -1 奥
+    const group = new THREE.Group();
+    const postR = 0.5; // 太さ
+    const goalW = 14, goalH = 7, depth = 4;
+    const mat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+
+    const bar = (w,h,d, x,y,z)=>{
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+      m.position.set(x,y,z);
+      group.add(m);
+    };
+    // 2本のポスト
+    bar(postR, goalH, postR, -goalW/2, goalH/2, zSign*(FIELD_H/2+postR/2));
+    bar(postR, goalH, postR,  goalW/2, goalH/2, zSign*(FIELD_H/2+postR/2));
+    // クロスバー
+    bar(goalW+postR, postR, postR, 0, goalH, zSign*(FIELD_H/2+postR/2));
+    // 奥行きのバー（簡易）
+    bar(postR, goalH, postR, -goalW/2, goalH/2, zSign*(FIELD_H/2+postR/2+depth));
+    bar(postR, goalH, postR,  goalW/2, goalH/2, zSign*(FIELD_H/2+postR/2+depth));
+    bar(goalW+postR, postR, postR, 0, goalH, zSign*(FIELD_H/2+postR/2+depth));
+    return group;
+  }
+  scene.add(makeGoal(+1));
+  scene.add(makeGoal(-1));
+
+  // ====== 選手 ======
   const players = [];
-  const playerGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
+  const playerGeo = new THREE.CylinderGeometry(1,1,2,32);
 
-  function createPlayer(x, z, color, number) {
-    const material = new THREE.MeshPhongMaterial({ color });
-    const player = new THREE.Mesh(playerGeometry, material);
-    player.position.set(x, 1, z);
-    scene.add(player);
-
-    // 番号ラベル
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = 64;
-    canvas.height = 64;
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, 64, 64);
-    ctx.fillStyle = "black";
-    ctx.font = "32px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(number, 32, 32);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(5, 5, 1);
-    sprite.position.set(0, 4, 0);
-    player.add(sprite);
-
-    player.userData.number = number;
-    players.push(player);
-    return player;
+  function makeLabelTexture(text){
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    c.width = 128; c.height = 128;
+    ctx.fillStyle = 'white'; ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle = 'black'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 64px system-ui';
+    ctx.fillText(text, c.width/2, c.height/2);
+    return new THREE.CanvasTexture(c);
   }
 
-  // 赤チーム
-  for (let i = 0; i < 11; i++) {
-    createPlayer(-30 + i * 6, -15, 0xff0000, i + 1);
-  }
-  // 青チーム
-  for (let i = 0; i < 11; i++) {
-    createPlayer(-30 + i * 6, 15, 0x0000ff, i + 1);
+  function createPlayer(x,z,color,number,team){
+    const mat = new THREE.MeshPhongMaterial({ color });
+    const m = new THREE.Mesh(playerGeo, mat);
+    m.position.set(x,1,z);
+    m.userData = { number, team };
+    scene.add(m);
+
+    const tex = makeLabelTexture(String(number));
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+    spr.scale.set(6,6,1);
+    spr.position.set(0, 4, 0);
+    m.add(spr);
+
+    players.push(m);
+    return m;
   }
 
-  // ドラッグ・タップ判定
+  // 赤（上側・Z=-）/ 青（下側・Z=+）
+  for(let i=0;i<11;i++) createPlayer(-30 + i*6, -15, 0xff5555, i+1, 'R');
+  for(let i=0;i<11;i++) createPlayer(-30 + i*6,  15, 0x5599ff, i+1, 'B');
+
+  // ====== 入力（ドラッグ移動 / タップ判定） ======
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
   let selectedPlayer = null;
+  let downPos = {x:0,y:0};
   let dragging = false;
-  let downPos = {x:0, y:0};
 
-  function getMouse(event) {
+  function normPointer(event){
     const rect = renderer.domElement.getBoundingClientRect();
-    if (event.touches) {
-      mouse.x = ((event.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.touches[0].clientY - rect.top) / rect.height) * 2 + 1;
-    } else {
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    }
+    const cx = event.touches ? event.touches[0].clientX : event.clientX;
+    const cy = event.touches ? event.touches[0].clientY : event.clientY;
+    mouse.x = ((cx - rect.left)/rect.width)*2 - 1;
+    mouse.y = -((cy - rect.top)/rect.height)*2 + 1;
+    return { cx, cy };
   }
 
-  function onPointerDown(event) {
-    getMouse(event);
+  function onDown(e){
+    if(isPlayerView) { look_onDown(e); return; }
+    const p = normPointer(e);
+    downPos = p; dragging = false;
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(players);
-    if (intersects.length > 0) {
-      selectedPlayer = intersects[0].object;
-    }
-    downPos = {x: event.clientX || event.touches[0].clientX, y: event.clientY || event.touches[0].clientY};
-    dragging = false;
+    const hit = raycaster.intersectObjects(players);
+    selectedPlayer = (hit.length>0) ? hit[0].object : null;
   }
-
-  function onPointerMove(event) {
-    if (!selectedPlayer) return;
+  function onMove(e){
+    if(isPlayerView) { look_onMove(e); return; }
+    if(!selectedPlayer) return;
     dragging = true;
-    getMouse(event);
+    normPointer(e);
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(field);
-    if (intersects.length > 0) {
-      selectedPlayer.position.set(intersects[0].point.x, 1, intersects[0].point.z);
+    const hit = raycaster.intersectObject(field);
+    if(hit.length>0){
+      selectedPlayer.position.set(hit[0].point.x, 1, hit[0].point.z);
     }
   }
-
-  function onPointerUp(event) {
-    if (selectedPlayer) {
-      const upPos = {x: event.clientX || (event.changedTouches && event.changedTouches[0].clientX),
-                     y: event.clientY || (event.changedTouches && event.changedTouches[0].clientY)};
-      const dx = Math.abs(upPos.x - downPos.x);
-      const dy = Math.abs(upPos.y - downPos.y);
-      if (!dragging && dx < 5 && dy < 5) {
-        // タップ判定 → 視点切り替え
-        playerView(selectedPlayer);
+  function onUp(e){
+    if(isPlayerView) { look_onUp(e); return; }
+    if(selectedPlayer){
+      const upx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+      const upy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+      const dx = Math.abs(upx - downPos.cx), dy = Math.abs(upy - downPos.cy);
+      if(!dragging && dx<5 && dy<5){
+        enterPlayerView(selectedPlayer);
       }
     }
-    selectedPlayer = null;
-    dragging = false;
+    selectedPlayer = null; dragging = false;
   }
 
-  renderer.domElement.addEventListener('mousedown', onPointerDown);
-  renderer.domElement.addEventListener('mousemove', onPointerMove);
-  renderer.domElement.addEventListener('mouseup', onPointerUp);
+  renderer.domElement.addEventListener('mousedown', onDown);
+  renderer.domElement.addEventListener('mousemove', onMove);
+  renderer.domElement.addEventListener('mouseup', onUp);
+  renderer.domElement.addEventListener('touchstart', onDown, {passive:false});
+  renderer.domElement.addEventListener('touchmove',  onMove,  {passive:false});
+  renderer.domElement.addEventListener('touchend',   onUp);
 
-  renderer.domElement.addEventListener('touchstart', onPointerDown);
-  renderer.domElement.addEventListener('touchmove', onPointerMove);
-  renderer.domElement.addEventListener('touchend', onPointerUp);
-
-  // 選手視点カメラ
+  // ====== 選手視点（360°見回し：カスタムlook制御） ======
   let isPlayerView = false;
-  const backButton = document.getElementById("backButton");
+  const backBtn = document.getElementById('backBtn');
+  let lookYaw = 0, lookPitch = 0; // ラジアン
+  let lookDragging = false;
+  let lookLast = {x:0,y:0};
 
-  function playerView(player) {
+  function enterPlayerView(player){
     isPlayerView = true;
+    // カメラを選手頭上へ
     camera.position.copy(player.position);
     camera.position.y += 2;
-    camera.lookAt(player.position.x, 2, player.position.z + 5);
-    backButton.style.display = "block";
+    // 向きはそのまま（0）
+    lookYaw = 0; lookPitch = 0;
+    updateLookDirection();
+    backBtn.style.display = 'inline-block';
+  }
+  function exitPlayerView(){
+    isPlayerView = false;
+    backBtn.style.display = 'none';
+    camera.position.set(0,55,85);
+    camera.lookAt(0,0,0);
+  }
+  backBtn.addEventListener('click', exitPlayerView);
+
+  function updateLookDirection(){
+    // yaw: 左右、pitch: 上下
+    const dir = new THREE.Vector3(
+      Math.sin(lookYaw) * Math.cos(lookPitch),
+      Math.sin(lookPitch),
+      Math.cos(lookYaw) * Math.cos(lookPitch)
+    );
+    const target = new THREE.Vector3().copy(camera.position).add(dir);
+    camera.lookAt(target);
   }
 
-  backButton.addEventListener("click", () => {
-    isPlayerView = false;
-    camera.position.set(0, 50, 80);
-    camera.lookAt(0, 0, 0);
-    backButton.style.display = "none";
+  function look_onDown(e){
+    const p = normPointer(e);
+    lookDragging = true;
+    lookLast = {x: p.cx, y: p.cy};
+    e.preventDefault?.();
+  }
+  function look_onMove(e){
+    if(!lookDragging) return;
+    const p = normPointer(e);
+    const dx = p.cx - lookLast.x;
+    const dy = p.cy - lookLast.y;
+    lookLast = {x:p.cx, y:p.cy};
+    // 感度調整（画面幅に対する割合で回転）
+    const sens = 0.005;
+    lookYaw  -= dx * sens;
+    lookPitch -= dy * sens;
+    // ピッチは上下80度に制限
+    const maxP = THREE.MathUtils.degToRad(80);
+    lookPitch = Math.max(-maxP, Math.min(maxP, lookPitch));
+    updateLookDirection();
+    e.preventDefault?.();
+  }
+  function look_onUp(e){
+    lookDragging = false;
+  }
+
+  // ====== 保存 / 読み込み / クリア ======
+  const KEY = 'soccerBoardPositions_v1';
+  const saveBtn  = document.getElementById('saveBtn');
+  const loadBtn  = document.getElementById('loadBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  saveBtn.addEventListener('click', ()=>{
+    const data = players.map(p=>({
+      x: p.position.x, z: p.position.z,
+      team: p.userData.team, number: p.userData.number
+    }));
+    localStorage.setItem(KEY, JSON.stringify(data));
+    flashMsg('保存しました');
   });
 
-  // レンダリングループ
-  function animate() {
+  loadBtn.addEventListener('click', ()=>{
+    const raw = localStorage.getItem(KEY);
+    if(!raw){ flashMsg('保存データがありません'); return; }
+    try{
+      const data = JSON.parse(raw);
+      if(!Array.isArray(data) || data.length !== players.length){
+        flashMsg('データ形式が合いません');
+        return;
+      }
+      data.forEach((d,i)=>{
+        players[i].position.x = d.x;
+        players[i].position.z = d.z;
+      });
+      flashMsg('読み込みました');
+    }catch(e){
+      flashMsg('読み込みでエラー');
+    }
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    localStorage.removeItem(KEY);
+    flashMsg('保存データをクリアしました');
+  });
+
+  function flashMsg(text){
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.position = 'absolute';
+    el.style.left = '50%';
+    el.style.top = '50%';
+    el.style.transform = 'translate(-50%,-50%)';
+    el.style.background = 'rgba(0,0,0,.75)';
+    el.style.color = '#fff';
+    el.style.padding = '10px 14px';
+    el.style.borderRadius = '8px';
+    el.style.zIndex = 20;
+    el.style.fontFamily = 'system-ui, -apple-system';
+    document.body.appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 1000);
+  }
+
+  // ====== ループ & リサイズ ======
+  function animate(){
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
   }
   animate();
 
-  // リサイズ対応
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+  addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
