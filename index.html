@@ -6,10 +6,22 @@
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; touch-action: none; }
+    #backButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      display: none;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
 <body>
+<button id="backButton">視点を戻す</button>
 <script>
   // シーン・カメラ・レンダラー
   const scene = new THREE.Scene();
@@ -33,22 +45,55 @@
   field.rotation.x = -Math.PI / 2;
   scene.add(field);
 
-  // 選手
+  // 選手作成
   const players = [];
   const playerGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
-  const playerMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
 
-  for (let i = 0; i < 11; i++) {
-    const player = new THREE.Mesh(playerGeometry, playerMaterial);
-    player.position.set(-40 + i * 8, 1, 0);
+  function createPlayer(x, z, color, number) {
+    const material = new THREE.MeshPhongMaterial({ color });
+    const player = new THREE.Mesh(playerGeometry, material);
+    player.position.set(x, 1, z);
     scene.add(player);
+
+    // 番号ラベル
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = 64;
+    canvas.height = 64;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.fillStyle = "black";
+    ctx.font = "32px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(number, 32, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(5, 5, 1);
+    sprite.position.set(0, 4, 0);
+    player.add(sprite);
+
+    player.userData.number = number;
     players.push(player);
+    return player;
   }
 
-  // ドラッグで移動できる処理
+  // 赤チーム
+  for (let i = 0; i < 11; i++) {
+    createPlayer(-30 + i * 6, -15, 0xff0000, i + 1);
+  }
+  // 青チーム
+  for (let i = 0; i < 11; i++) {
+    createPlayer(-30 + i * 6, 15, 0x0000ff, i + 1);
+  }
+
+  // ドラッグで移動処理
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
   let selectedPlayer = null;
+  let dragging = false;
 
   function getMouse(event) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -67,11 +112,12 @@
     const intersects = raycaster.intersectObjects(players);
     if (intersects.length > 0) {
       selectedPlayer = intersects[0].object;
+      dragging = true;
     }
   }
 
   function onPointerMove(event) {
-    if (!selectedPlayer) return;
+    if (!selectedPlayer || !dragging) return;
     getMouse(event);
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObject(field);
@@ -80,8 +126,13 @@
     }
   }
 
-  function onPointerUp() {
+  function onPointerUp(event) {
+    if (!dragging && selectedPlayer) {
+      // 視点切り替え
+      playerView(selectedPlayer);
+    }
     selectedPlayer = null;
+    dragging = false;
   }
 
   renderer.domElement.addEventListener('mousedown', onPointerDown);
@@ -91,6 +142,25 @@
   renderer.domElement.addEventListener('touchstart', onPointerDown);
   renderer.domElement.addEventListener('touchmove', onPointerMove);
   renderer.domElement.addEventListener('touchend', onPointerUp);
+
+  // 選手視点カメラ
+  let isPlayerView = false;
+  const backButton = document.getElementById("backButton");
+
+  function playerView(player) {
+    isPlayerView = true;
+    camera.position.copy(player.position);
+    camera.position.y += 2;
+    camera.lookAt(player.position.x, 2, player.position.z + 5);
+    backButton.style.display = "block";
+  }
+
+  backButton.addEventListener("click", () => {
+    isPlayerView = false;
+    camera.position.set(0, 50, 80);
+    camera.lookAt(0, 0, 0);
+    backButton.style.display = "none";
+  });
 
   // レンダリングループ
   function animate() {
