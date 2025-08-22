@@ -2,84 +2,33 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Soccer Board</title>
+  <title>Test Field</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-    #resetView {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 8px 12px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      border: none;
-      cursor: pointer;
-      z-index: 10;
-    }
   </style>
 </head>
 <body>
-  <button id="resetView">視点を戻す</button>
   <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/examples/js/controls/OrbitControls.js"></script>
   <script>
     const scene = new THREE.Scene();
 
-    // カメラ設定（高めから俯瞰）
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 5000);
     camera.position.set(0, 800, 800);
     camera.lookAt(0, 0, 0);
 
-    // レンダラー
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // 明るめのライト
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(100, 200, 100);
-    scene.add(dirLight);
-
-    // フィールド
-    const fieldWidth = 1000;
-    const fieldHeight = 600;
-    const fieldGeometry = new THREE.PlaneGeometry(fieldWidth, fieldHeight);
-    const fieldMaterial = new THREE.MeshPhongMaterial({
-      color: 0x228b22,
-      side: THREE.DoubleSide
-    });
-    const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
+    // フィールド（緑の板）
+    const geometry = new THREE.PlaneGeometry(1000, 600);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+    const field = new THREE.Mesh(geometry, material);
     field.rotation.x = -Math.PI / 2;
     scene.add(field);
 
-    // 操作用コントロール（ズーム・回転）
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enablePan = true;
-    controls.minDistance = 200;   // ズームの下限
-    controls.maxDistance = 2000;  // ズームの上限
-    controls.maxPolarAngle = Math.PI / 2; // 真下には行き過ぎない
-
-    // 視点リセットボタン
-    document.getElementById('resetView').addEventListener('click', () => {
-      camera.position.set(0, 800, 800);
-      camera.lookAt(0, 0, 0);
-      controls.update();
-    });
-
-    // レスポンシブ対応
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // 描画ループ
     function animate() {
       requestAnimationFrame(animate);
-      controls.update();
       renderer.render(scene, camera);
     }
     animate();
