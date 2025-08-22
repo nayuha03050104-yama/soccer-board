@@ -2,10 +2,62 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>表示テスト</title>
+  <title>サッカー戦術ボード</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
 <body>
-  <h1>こんにちは！これはテスト表示です。</h1>
-  <p>この文字が見えれば GitHub Pages の公開は成功しています。</p>
+<script>
+  // シーン・カメラ・レンダラー
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 50, 80);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // 照明
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(50, 100, 50);
+  scene.add(light);
+
+  // サッカーグラウンド（緑の床）
+  const fieldGeometry = new THREE.PlaneGeometry(100, 60);
+  const fieldMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+  const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
+  field.rotation.x = -Math.PI / 2;
+  scene.add(field);
+
+  // 選手（白い円柱）
+  const players = [];
+  const playerGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
+  const playerMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
+
+  for (let i = 0; i < 11; i++) {
+    const player = new THREE.Mesh(playerGeometry, playerMaterial);
+    player.position.set(-40 + i * 8, 1, 0);
+    scene.add(player);
+    players.push(player);
+  }
+
+  // レンダリングループ
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // 画面リサイズ対応
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
 </body>
 </html>
