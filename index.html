@@ -1,126 +1,137 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>サッカー戦術ボード - フィールド完成版</title>
+  <meta charset="UTF-8" />
+  <title>Soccer Board</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
+    #resetCamera {
+      position: absolute;
+      top: 10px; left: 10px;
+      padding: 8px 12px;
+      background: white; border: 1px solid #333;
+      cursor: pointer; z-index: 10;
+    }
   </style>
 </head>
 <body>
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <button id="resetCamera">視点を戻す</button>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // 明るい青空色
 
-<script>
-  // 基本セットアップ
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB); // 明るい空色背景
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 120, 120);
 
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 5000);
-  camera.position.set(0, 800, 1200); // 高く・遠くから見下ろす
-  camera.lookAt(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer({antialias: true});
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // ライト
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(300, 500, 300).normalize();
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xaaaaaa)); // 全体を少し明るく
-
-  // === フィールド作成 ===
-  const fieldLength = 1050; // 実際の比率に近く
-  const fieldWidth = 680;
-  const fieldGeometry = new THREE.PlaneGeometry(fieldLength, fieldWidth);
-  const fieldMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
-  const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
-  field.rotation.x = -Math.PI / 2;
-  scene.add(field);
-
-  // ライン描画（白）
-  function drawLine(x1, y1, x2, y2) {
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff });
-    const points = [
-      new THREE.Vector3(x1, 0.2, y1),
-      new THREE.Vector3(x2, 0.2, y2)
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
-  }
-
-  // 外枠（タッチライン・ゴールライン）
-  drawLine(-fieldLength/2, -fieldWidth/2, fieldLength/2, -fieldWidth/2);
-  drawLine(-fieldLength/2, fieldWidth/2, fieldLength/2, fieldWidth/2);
-  drawLine(-fieldLength/2, -fieldWidth/2, -fieldLength/2, fieldWidth/2);
-  drawLine(fieldLength/2, -fieldWidth/2, fieldLength/2, fieldWidth/2);
-
-  // ハーフライン
-  drawLine(0, -fieldWidth/2, 0, fieldWidth/2);
-
-  // センターサークル
-  const circleGeometry = new THREE.RingGeometry(90, 91, 64);
-  const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const circle = new THREE.Mesh(circleGeometry, circleMaterial);
-  circle.rotation.x = -Math.PI / 2;
-  scene.add(circle);
-
-  // ペナルティエリア（片側）
-  function drawPenaltyArea(xCenter) {
-    const areaWidth = 400;
-    const areaHeight = 165;
-    const leftX = xCenter - areaHeight/2;
-    const rightX = xCenter + areaHeight/2;
-    const topY = areaWidth/2;
-    const bottomY = -areaWidth/2;
-    drawLine(leftX, topY, rightX, topY);
-    drawLine(leftX, bottomY, rightX, bottomY);
-    drawLine(leftX, bottomY, leftX, topY);
-    drawLine(rightX, bottomY, rightX, topY);
-  }
-  drawPenaltyArea(-fieldLength/2); // 左側
-  drawPenaltyArea(fieldLength/2);  // 右側
-
-  // ゴール（白枠で簡易）
-  function createGoal(xPos) {
-    const goalWidth = 73;
-    const goalHeight = 24;
-    const goalDepth = 10;
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff });
-    const points = [
-      new THREE.Vector3(xPos, 0, -goalWidth/2),
-      new THREE.Vector3(xPos, goalHeight, -goalWidth/2),
-      new THREE.Vector3(xPos+goalDepth, goalHeight, -goalWidth/2),
-      new THREE.Vector3(xPos+goalDepth, 0, -goalWidth/2),
-      new THREE.Vector3(xPos, 0, -goalWidth/2),
-      new THREE.Vector3(xPos, 0, goalWidth/2),
-      new THREE.Vector3(xPos, goalHeight, goalWidth/2),
-      new THREE.Vector3(xPos+goalDepth, goalHeight, goalWidth/2),
-      new THREE.Vector3(xPos+goalDepth, 0, goalWidth/2),
-      new THREE.Vector3(xPos, 0, goalWidth/2),
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
-  }
-  createGoal(-fieldLength/2); // 左ゴール
-  createGoal(fieldLength/2);  // 右ゴール
-
-  // リサイズ対応
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    document.body.appendChild(renderer.domElement);
 
-  // レンダリングループ
-  function animate() {
-    requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-  }
-  animate();
-</script>
+    // カメラコントロール
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.minDistance = 50;
+    controls.maxDistance = 200;
+    controls.enablePan = true;
+
+    // フィールド寸法 (実寸比率)
+    const fieldLength = 105; // m
+    const fieldWidth = 68;   // m
+
+    // フィールド用キャンバス
+    const canvas = document.createElement("canvas");
+    canvas.width = 2048; // 解像度アップ対応（前よりキレイ）
+    canvas.height = 2048;
+    const ctx = canvas.getContext("2d");
+
+    // 緑の芝
+    ctx.fillStyle = "#228B22";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // スケーリング
+    function toCanvasX(x) { return (x / fieldLength + 0.5) * canvas.width; }
+    function toCanvasY(y) { return (0.5 - y / fieldWidth) * canvas.height; }
+
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 5;
+
+    // 外枠
+    ctx.strokeRect(toCanvasX(-fieldLength/2), toCanvasY(fieldWidth/2),
+                   toCanvasX(fieldLength/2) - toCanvasX(-fieldLength/2),
+                   toCanvasY(-fieldWidth/2) - toCanvasY(fieldWidth/2));
+
+    // ハーフライン
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(0), toCanvasY(fieldWidth/2));
+    ctx.lineTo(toCanvasX(0), toCanvasY(-fieldWidth/2));
+    ctx.stroke();
+
+    // センターサークル
+    ctx.beginPath();
+    ctx.arc(canvas.width/2, canvas.height/2, (9.15/fieldLength) * canvas.width, 0, Math.PI*2);
+    ctx.stroke();
+
+    // ペナルティエリア（両側）
+    const penaltyWidth = 40.3; // m
+    const penaltyDepth = 16.5; // m
+
+    // 左
+    ctx.strokeRect(toCanvasX(-fieldLength/2), toCanvasY(penaltyWidth/2),
+                   toCanvasX(-fieldLength/2 + penaltyDepth) - toCanvasX(-fieldLength/2),
+                   toCanvasY(-penaltyWidth/2) - toCanvasY(penaltyWidth/2));
+    // 右
+    ctx.strokeRect(toCanvasX(fieldLength/2 - penaltyDepth), toCanvasY(penaltyWidth/2),
+                   toCanvasX(fieldLength/2) - toCanvasX(fieldLength/2 - penaltyDepth),
+                   toCanvasY(-penaltyWidth/2) - toCanvasY(penaltyWidth/2));
+
+    // ゴールエリア（両側）
+    const goalWidth = 18.32; // m
+    const goalDepth = 5.5;   // m
+
+    // 左
+    ctx.strokeRect(toCanvasX(-fieldLength/2), toCanvasY(goalWidth/2),
+                   toCanvasX(-fieldLength/2 + goalDepth) - toCanvasX(-fieldLength/2),
+                   toCanvasY(-goalWidth/2) - toCanvasY(goalWidth/2));
+    // 右
+    ctx.strokeRect(toCanvasX(fieldLength/2 - goalDepth), toCanvasY(goalWidth/2),
+                   toCanvasX(fieldLength/2) - toCanvasX(fieldLength/2 - goalDepth),
+                   toCanvasY(-goalWidth/2) - toCanvasY(goalWidth/2));
+
+    // テクスチャとして適用
+    const texture = new THREE.CanvasTexture(canvas);
+    const fieldGeometry = new THREE.PlaneGeometry(fieldLength, fieldWidth);
+    const fieldMaterial = new THREE.MeshBasicMaterial({ map: texture });
+    const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
+    field.rotation.x = -Math.PI/2;
+    scene.add(field);
+
+    // ライト
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(50, 100, 50);
+    scene.add(light);
+
+    // 視点リセット
+    document.getElementById("resetCamera").addEventListener("click", () => {
+      camera.position.set(0, 120, 120);
+      controls.target.set(0, 0, 0);
+    });
+
+    // レンダリングループ
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
