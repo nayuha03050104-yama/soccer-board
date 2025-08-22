@@ -16,8 +16,9 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB); // 明るい空色背景
 
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
-  camera.position.set(0, 500, 800);
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 5000);
+  camera.position.set(0, 800, 1200); // 高く・遠くから見下ろす
+  camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({antialias: true});
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -25,8 +26,9 @@
 
   // ライト
   const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(100, 200, 100).normalize();
+  light.position.set(300, 500, 300).normalize();
   scene.add(light);
+  scene.add(new THREE.AmbientLight(0xaaaaaa)); // 全体を少し明るく
 
   // === フィールド作成 ===
   const fieldLength = 1050; // 実際の比率に近く
@@ -39,10 +41,10 @@
 
   // ライン描画（白）
   function drawLine(x1, y1, x2, y2) {
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+    const material = new THREE.LineBasicMaterial({ color: 0xffffff });
     const points = [
-      new THREE.Vector3(x1, 0.1, y1),
-      new THREE.Vector3(x2, 0.1, y2)
+      new THREE.Vector3(x1, 0.2, y1),
+      new THREE.Vector3(x2, 0.2, y2)
     ];
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const line = new THREE.Line(geometry, material);
