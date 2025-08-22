@@ -5,7 +5,7 @@
   <title>サッカー戦術ボード</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
+    canvas { display: block; touch-action: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
@@ -26,14 +26,14 @@
   light.position.set(50, 100, 50);
   scene.add(light);
 
-  // サッカーグラウンド（緑の床）
+  // サッカーグラウンド
   const fieldGeometry = new THREE.PlaneGeometry(100, 60);
   const fieldMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
   const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
   field.rotation.x = -Math.PI / 2;
   scene.add(field);
 
-  // 選手（白い円柱）
+  // 選手
   const players = [];
   const playerGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
   const playerMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
@@ -45,6 +45,53 @@
     players.push(player);
   }
 
+  // ドラッグで移動できる処理
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let selectedPlayer = null;
+
+  function getMouse(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (event.touches) {
+      mouse.x = ((event.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.touches[0].clientY - rect.top) / rect.height) * 2 + 1;
+    } else {
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+  }
+
+  function onPointerDown(event) {
+    getMouse(event);
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(players);
+    if (intersects.length > 0) {
+      selectedPlayer = intersects[0].object;
+    }
+  }
+
+  function onPointerMove(event) {
+    if (!selectedPlayer) return;
+    getMouse(event);
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(field);
+    if (intersects.length > 0) {
+      selectedPlayer.position.set(intersects[0].point.x, 1, intersects[0].point.z);
+    }
+  }
+
+  function onPointerUp() {
+    selectedPlayer = null;
+  }
+
+  renderer.domElement.addEventListener('mousedown', onPointerDown);
+  renderer.domElement.addEventListener('mousemove', onPointerMove);
+  renderer.domElement.addEventListener('mouseup', onPointerUp);
+
+  renderer.domElement.addEventListener('touchstart', onPointerDown);
+  renderer.domElement.addEventListener('touchmove', onPointerMove);
+  renderer.domElement.addEventListener('touchend', onPointerUp);
+
   // レンダリングループ
   function animate() {
     requestAnimationFrame(animate);
@@ -52,7 +99,7 @@
   }
   animate();
 
-  // 画面リサイズ対応
+  // リサイズ対応
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
